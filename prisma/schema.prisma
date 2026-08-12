@@ -1,0 +1,93 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  Admin
+  Doctor
+  Nurse
+  Receptionist
+}
+
+enum AccountStatus {
+  Active
+  Inactive
+}
+
+model User {
+  id        String        @id @default(uuid())
+  name      String
+  email     String        @unique
+  password  String
+  role      Role          @default(Receptionist)
+  status    AccountStatus @default(Active)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("users")
+}
+
+model Patient {
+  id                    String   @id @default(uuid())
+  registrationType      String
+  uhid                  String   @unique
+  title                 String
+  firstName             String
+  middleName            String?
+  lastName              String?
+  fullName              String
+  gender                String
+  maritalStatus         String?
+  dob                   DateTime?
+  age                   Int?
+  guardianName          String
+  guardianRelation      String?
+  regDate               DateTime @default(now())
+  mobile                String
+  address               String
+  country               String   @default("India")
+  state                 String
+  districtCity          String?
+  area                  String?
+  pinCode               String?
+  altPhone              String?
+  email                 String?
+  emergencyName         String?
+  emergencyRelationship String?
+  emergencyContact      String?
+  nationality           String   @default("Indian")
+  aadhaarCard           String?
+  panNo                 String?
+  payerType             String
+  payer                 String?
+  sponsor               String?
+  provider              String?
+  leadSource            String?
+  referredType          String?
+  referredBy            String?
+  hcf                   String?
+  status                String   @default("Active")
+  remarks               String?
+  religion              String?
+  occupation            String?
+  isVip                 Boolean  @default(false)
+  isAnimation           Boolean  @default(false)
+  nameMasking           Boolean  @default(false)
+  handleWithCare        Boolean  @default(false)
+  sendPromoSms          Boolean  @default(false)
+  sendPromoEmail        Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([firstName])
+  @@index([lastName])
+  @@index([fullName])
+  @@index([mobile])
+  @@index([aadhaarCard])
+  @@map("patients")
+}

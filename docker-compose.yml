@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: caresuite_api
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/cmk_caresuite?schema=public
+      - JWT_SECRET=b6e0fb8f9fcf32bfce363c8702b8d0092d6e7f1e63a1a6b0c26685f0ef30b355
+      - JWT_EXPIRES_IN=7d
+      - CORS_ORIGIN=*
+      - LOG_LEVEL=info
+    depends_on:
+      - db
+    volumes:
+      - ./logs:/usr/src/app/logs
+      - ./uploads:/usr/src/app/uploads
+
+  db:
+    image: postgres:15-alpine
+    container_name: caresuite_db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=cmk_caresuite
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
