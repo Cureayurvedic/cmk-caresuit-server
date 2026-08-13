@@ -9,6 +9,12 @@ const router = Router();
 // Apply auth protection globally to all patient routes
 router.use(protect);
 
+router.route("/import")
+  .post(
+    authorize("Admin", "Receptionist"),
+    PatientController.importBulk
+  );
+
 router.route("/")
   .get(
     authorize("Admin", "Doctor", "Nurse", "Receptionist"),

@@ -1,8 +1,11 @@
 import { z } from "zod";
 
+const sanitizeDigits = (val) => (typeof val === "string" ? val.replace(/[\s-]/g, "") : val);
+const sanitizePan = (val) => (typeof val === "string" ? val.trim().toUpperCase() : val);
+
 export const createPatientSchema = z.object({
   registrationType: z.string().min(1, "Registration type is required"),
-  uhid: z.string().optional(),
+  uhid: z.string().optional().or(z.literal("")),
   title: z.string().min(1, "Title is required"),
   firstName: z.string().min(1, "First name is required").regex(/^[A-Za-z\s]+$/, "Only alphabets are allowed in first name"),
   middleName: z.string().regex(/^[A-Za-z\s]*$/, "Only alphabets are allowed in middle name").optional().or(z.literal("")),
@@ -16,25 +19,25 @@ export const createPatientSchema = z.object({
   regDate: z.string().optional().or(z.literal("")),
   
   // Contact
-  mobile: z.string().regex(/^\d{10}$/, "Mobile number must be exactly 10 digits"),
+  mobile: z.preprocess(sanitizeDigits, z.string().regex(/^\d{10}$/, "Mobile number must be exactly 10 digits")),
   address: z.string().min(1, "Address is required"),
   country: z.string().default("India"),
   state: z.string().min(1, "State is required"),
   districtCity: z.string().optional().or(z.literal("")),
   area: z.string().optional().or(z.literal("")),
-  pinCode: z.string().regex(/^\d{6}$/, "PIN code must be exactly 6 digits").optional().or(z.literal("")),
-  altPhone: z.string().regex(/^\d{10}$/, "Alternative phone must be exactly 10 digits").optional().or(z.literal("")),
+  pinCode: z.preprocess(sanitizeDigits, z.string().regex(/^\d{6}$/, "PIN code must be exactly 6 digits").optional().or(z.literal(""))),
+  altPhone: z.preprocess(sanitizeDigits, z.string().regex(/^\d{10}$/, "Alternative phone must be exactly 10 digits").optional().or(z.literal(""))),
   email: z.string().email("Invalid email format").optional().or(z.literal("")),
   
   // Emergency
   emergencyName: z.string().regex(/^[A-Za-z\s]*$/, "Only alphabets are allowed in emergency name").optional().or(z.literal("")),
   emergencyRelationship: z.string().optional().or(z.literal("")),
-  emergencyContact: z.string().regex(/^\d{10}$/, "Emergency contact must be exactly 10 digits").optional().or(z.literal("")),
+  emergencyContact: z.preprocess(sanitizeDigits, z.string().regex(/^\d{10}$/, "Emergency contact must be exactly 10 digits").optional().or(z.literal(""))),
   
   // Identity
   nationality: z.string().default("Indian"),
-  aadhaarCard: z.string().regex(/^\d{12}$/, "Aadhaar number must be exactly 12 digits").optional().or(z.literal("")),
-  panNo: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN format").optional().or(z.literal("")),
+  aadhaarCard: z.preprocess(sanitizeDigits, z.string().regex(/^\d{12}$/, "Aadhaar number must be exactly 12 digits").optional().or(z.literal(""))),
+  panNo: z.preprocess(sanitizePan, z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN format").optional().or(z.literal(""))),
   
   // Payer
   payerType: z.string().min(1, "Payer type is required"),

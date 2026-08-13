@@ -50,6 +50,17 @@ export class PatientController {
       message: "Patient record deleted successfully",
     });
   });
+
+  static importBulk = asyncHandler(async (req, res) => {
+    const patientsList = req.body.patients || req.body;
+    const result = await PatientService.bulkImportPatients(patientsList);
+
+    res.status(200).json({
+      success: true,
+      message: `Bulk import completed: ${result.insertedCount} inserted, ${result.skippedCount} skipped.`,
+      data: result,
+    });
+  });
 }
 
 export default PatientController;
