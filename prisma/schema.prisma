@@ -91,3 +91,46 @@ model Patient {
   @@index([aadhaarCard])
   @@map("patients")
 }
+
+model Invoice {
+  id           String   @id @default(uuid())
+  company      String
+  uhid         String
+  patientName  String
+  encNo        String
+  type         String   // "OP" | "IP"
+  invoiceNo    String   @unique
+  date         DateTime
+  netAmt       Float
+  paidPatient  Float    @default(0)
+  paidPayer    Float    @default(0)
+  adjusted     Float    @default(0)
+  refund       Float    @default(0)
+  creditNote   Float    @default(0)
+  balance      Float
+  status       String   // "Outstanding" | "Settled" | "Refundable"
+  tdsAmt       Float    @default(0)
+  isCancelled  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  receipts     Receipt[]
+
+  @@map("invoices")
+}
+
+model Receipt {
+  id              String   @id @default(uuid())
+  invoiceId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  mode            String   // "Cash" | "Card" | "UPI" | "Cheque"
+  amount          Float
+  bankName        String?
+  beneficiaryName String?
+  refNo           String?
+  type            String   @default("Settlement") // "Settlement" | "Refund" | "CreditNote" | "TDS"
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@map("receipts")
+}
+
