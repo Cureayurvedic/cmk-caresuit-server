@@ -33,9 +33,9 @@ model User {
 }
 
 model Patient {
-  id                    String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   registrationType      String
-  uhid                  String   @unique
+  uhid                  String    @unique
   title                 String
   firstName             String
   middleName            String?
@@ -47,10 +47,10 @@ model Patient {
   age                   Int?
   guardianName          String
   guardianRelation      String?
-  regDate               DateTime @default(now())
+  regDate               DateTime  @default(now())
   mobile                String
   address               String
-  country               String   @default("India")
+  country               String    @default("India")
   state                 String
   districtCity          String?
   area                  String?
@@ -60,7 +60,7 @@ model Patient {
   emergencyName         String?
   emergencyRelationship String?
   emergencyContact      String?
-  nationality           String   @default("Indian")
+  nationality           String    @default("Indian")
   aadhaarCard           String?
   panNo                 String?
   payerType             String
@@ -71,18 +71,18 @@ model Patient {
   referredType          String?
   referredBy            String?
   hcf                   String?
-  status                String   @default("Active")
+  status                String    @default("Active")
   remarks               String?
   religion              String?
   occupation            String?
-  isVip                 Boolean  @default(false)
-  isAnimation           Boolean  @default(false)
-  nameMasking           Boolean  @default(false)
-  handleWithCare        Boolean  @default(false)
-  sendPromoSms          Boolean  @default(false)
-  sendPromoEmail        Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  isVip                 Boolean   @default(false)
+  isAnimation           Boolean   @default(false)
+  nameMasking           Boolean   @default(false)
+  handleWithCare        Boolean   @default(false)
+  sendPromoSms          Boolean   @default(false)
+  sendPromoEmail        Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([firstName])
   @@index([lastName])
@@ -93,44 +93,189 @@ model Patient {
 }
 
 model Invoice {
-  id           String   @id @default(uuid())
-  company      String
-  uhid         String
-  patientName  String
-  encNo        String
-  type         String   // "OP" | "IP"
-  invoiceNo    String   @unique
-  date         DateTime
-  netAmt       Float
-  paidPatient  Float    @default(0)
-  paidPayer    Float    @default(0)
-  adjusted     Float    @default(0)
-  refund       Float    @default(0)
-  creditNote   Float    @default(0)
-  balance      Float
-  status       String   // "Outstanding" | "Settled" | "Refundable"
-  tdsAmt       Float    @default(0)
-  isCancelled  Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  receipts     Receipt[]
+  id          String    @id @default(uuid())
+  company     String    @default("CASH / CASH")
+  uhid        String
+  patientName String
+  encNo       String
+  type        String    // "OP" | "IP"
+  invoiceNo   String    @unique
+  date        DateTime  @default(now())
+  doctorName  String?
+  department  String?
+  grossAmt    Float     @default(0)
+  discountAmt Float     @default(0)
+  taxAmt      Float     @default(0)
+  netAmt      Float
+  paidPatient Float     @default(0)
+  paidPayer   Float     @default(0)
+  adjusted    Float     @default(0)
+  refund      Float     @default(0)
+  creditNote  Float     @default(0)
+  balance     Float
+  status      String    // "Outstanding" | "Settled" | "Refundable" | "Cancelled"
+  tdsAmt      Float     @default(0)
+  isCancelled Boolean   @default(false)
+  itemsJson   String?   // JSON serialized line items
+  remarks     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  receipts    Receipt[]
 
+  @@index([uhid])
+  @@index([invoiceNo])
+  @@index([status])
   @@map("invoices")
 }
 
 model Receipt {
-  id              String   @id @default(uuid())
-  invoiceId       String
-  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  mode            String   // "Cash" | "Card" | "UPI" | "Cheque"
-  amount          Float
-  bankName        String?
-  beneficiaryName String?
-  refNo           String?
-  type            String   @default("Settlement") // "Settlement" | "Refund" | "CreditNote" | "TDS"
-  notes           String?
-  createdAt       DateTime @default(now())
+  id               String   @id @default(uuid())
+  receiptNo        String?
+  invoiceId        String?
+  invoice          Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  uhid             String?
+  patientName      String?
+  mode             String   // "Cash" | "Card" | "UPI" | "Cheque" | "Bank Transfer" | "CreditNote" | "TDS"
+  amount           Float
+  bankName         String?
+  beneficiaryName  String?
+  refNo            String?
+  cardSwipingValue Float?   @default(0)
+  type             String   @default("Settlement") // "Settlement" | "Advance" | "Refund" | "CreditNote" | "TDS"
+  notes            String?
+  createdAt        DateTime @default(now())
 
+  @@index([invoiceId])
+  @@index([uhid])
   @@map("receipts")
 }
 
+model OpVisit {
+  id              String   @id @default(uuid())
+  visitNo         String   @unique
+  uhid            String
+  patientName     String
+  doctorName      String
+  department      String?
+  payerType       String   @default("Direct Patient")
+  payer           String?
+  sponsor         String?
+  network         String?
+  consultationFee Float    @default(500)
+  visitType       String   @default("New") // "New" | "Follow-up" | "Emergency"
+  status          String   @default("Open") // "Open" | "Closed" | "Sent for Billing"
+  visitDate       DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([uhid])
+  @@index([visitNo])
+  @@map("op_visits")
+}
+
+model BillingOrder {
+  id             String   @id @default(uuid())
+  orderNo        String   @unique
+  uhid           String
+  visitNo        String?
+  patientName    String
+  doctorName     String
+  orderType      String   @default("General") // "Lab" | "Radiology" | "Procedure" | "Pharmacy" | "Consultation" | "General"
+  status         String   @default("Unbilled") // "Unbilled" | "Billed" | "Cancelled"
+  itemsJson      String   // JSON array of order line items
+  totalAmount    Float
+  discountAmount Float    @default(0)
+  netAmount      Float
+  remarks        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([uhid])
+  @@index([orderNo])
+  @@index([status])
+  @@map("billing_orders")
+}
+
+model AdvanceCollection {
+  id             String   @id @default(uuid())
+  advanceNo      String   @unique
+  uhid           String
+  patientName    String
+  encNo          String?
+  amount         Float
+  adjustedAmount Float    @default(0)
+  refundAmount   Float    @default(0)
+  balanceAmount  Float
+  mode           String   @default("Cash")
+  bankName       String?
+  beneficiaryName String?
+  refNo          String?
+  purpose        String?  // "Admission Advance", "Surgery Deposit", "General Advance"
+  status         String   @default("Active") // "Active" | "Fully Adjusted" | "Refunded"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([uhid])
+  @@index([advanceNo])
+  @@map("advance_collections")
+}
+
+model CreditNote {
+  id           String   @id @default(uuid())
+  creditNoteNo String   @unique
+  invoiceId    String?
+  invoiceNo    String
+  uhid         String
+  patientName  String
+  reason       String
+  amount       Float
+  authorizedBy String   @default("Dr. Admin")
+  createdAt    DateTime @default(now())
+
+  @@index([uhid])
+  @@index([invoiceNo])
+  @@map("credit_notes")
+}
+
+model RefundRecord {
+  id           String   @id @default(uuid())
+  refundNo     String   @unique
+  uhid         String
+  patientName  String
+  invoiceId    String?
+  invoiceNo    String?
+  receiptId    String?
+  amount       Float
+  mode         String   @default("Cash")
+  bankName     String?
+  refNo        String?
+  reason       String
+  authorizedBy String   @default("Dr. Admin")
+  status       String   @default("Processed")
+  createdAt    DateTime @default(now())
+
+  @@index([uhid])
+  @@index([refundNo])
+  @@map("refund_records")
+}
+
+model InsuranceIntimation {
+  id           String   @id @default(uuid())
+  uhid         String
+  patientName  String
+  encNo        String?
+  tpaName      String
+  policyNo     String
+  claimNo      String
+  requestedAmt Float
+  approvedAmt  Float    @default(0)
+  coPayAmt     Float    @default(0)
+  status       String   @default("Initiated") // "Initiated" | "Under Process" | "Query Raised" | "Approved" | "Rejected" | "Settled"
+  remarks      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([uhid])
+  @@index([claimNo])
+  @@map("insurance_intimations")
+}
