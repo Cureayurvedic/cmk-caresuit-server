@@ -55,4 +55,22 @@ export class AtdController {
       data: bed,
     });
   });
+
+  static addBed = asyncHandler(async (req, res) => {
+    const result = await AtdService.addBed(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Bed(s) created successfully",
+      data: result,
+    });
+  });
+
+  static deleteBed = asyncHandler(async (req, res) => {
+    const result = await AtdService.deleteBed(req.params.bedNo);
+    res.status(200).json({
+      success: true,
+      message: `Bed ${req.params.bedNo} removed successfully`,
+      data: result,
+    });
+  });
 }

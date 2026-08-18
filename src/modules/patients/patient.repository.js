@@ -1,16 +1,42 @@
 import { prisma } from "../../config/database.js";
 
 export class PatientRepository {
-  static async findAndCountAll({ search, page = 1, limit = 20 }) {
+  static async findAndCountAll({ search, page = 1, limit = 20, uhid, patientName, dob, mobile, phone, email, company, identityNo, address }) {
     const filter = {};
+    const AND = [];
 
     if (search) {
-      filter.OR = [
-        { fullName: { contains: search, mode: "insensitive" } },
-        { uhid: { contains: search, mode: "insensitive" } },
-        { mobile: { contains: search, mode: "insensitive" } },
-        { aadhaarCard: { contains: search, mode: "insensitive" } },
-      ];
+      AND.push({
+        OR: [
+          { fullName: { contains: search, mode: "insensitive" } },
+          { uhid: { contains: search, mode: "insensitive" } },
+          { mobile: { contains: search, mode: "insensitive" } },
+          { aadhaarCard: { contains: search, mode: "insensitive" } },
+        ]
+      });
+    }
+
+    if (uhid) AND.push({ uhid: { contains: uhid, mode: "insensitive" } });
+    if (patientName) AND.push({ fullName: { contains: patientName, mode: "insensitive" } });
+    if (mobile || phone) AND.push({ mobile: { contains: mobile || phone, mode: "insensitive" } });
+    if (email) AND.push({ email: { contains: email, mode: "insensitive" } });
+    if (company) AND.push({ payer: { contains: company, mode: "insensitive" } });
+    if (address) AND.push({ address: { contains: address, mode: "insensitive" } });
+    if (identityNo) {
+      AND.push({
+        OR: [
+          { aadhaarCard: { contains: identityNo, mode: "insensitive" } },
+          { panNo: { contains: identityNo, mode: "insensitive" } }
+        ]
+      });
+    }
+
+    // Since dob in DB is DateTime, we can do a loose string search if we had a string field,
+    // but Prisma doesn't support contains on DateTime easily.
+    // We'll skip dob filtering for now or just parse it if it's exact.
+    
+    if (AND.length > 0) {
+      filter.AND = AND;
     }
 
     const skip = (page - 1) * limit;

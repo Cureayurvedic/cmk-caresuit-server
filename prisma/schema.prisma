@@ -57,6 +57,7 @@ model Patient {
   pinCode               String?
   altPhone              String?
   email                 String?
+  photoUrl              String?
   emergencyName         String?
   emergencyRelationship String?
   emergencyContact      String?
@@ -278,4 +279,52 @@ model InsuranceIntimation {
   @@index([uhid])
   @@index([claimNo])
   @@map("insurance_intimations")
+}
+
+model MasterOption {
+  id        String   @id @default(uuid())
+  category  String   // "providers" | "leadSources" | "religions" | "occupations" | "branches" | "companies" | "insurances"
+  value     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, value])
+  @@index([category])
+  @@map("master_options")
+}
+
+model BedCategory {
+  id         String   @id @default(uuid())
+  name       String   @unique       // "DELUXE", "GENERAL", "ICU"
+  prefix     String   @unique       // "DLX", "GEN", "ICU" — used for auto bed numbering
+  ward       String                 // "Floor 2 - Deluxe Wing"
+  tariffRate Int      @default(2000) // daily tariff in ₹
+  totalBeds  Int      @default(0)
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  beds       Bed[]
+
+  @@index([sortOrder])
+  @@map("bed_categories")
+}
+
+model Bed {
+  id          String      @id @default(uuid())
+  bedNo       String      @unique   // e.g. "DLX-01", "GEN-10"
+  categoryId  String
+  category    BedCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  status      String      @default("Vacant") // "Vacant" | "Occupied" | "House Keeping" | "Retain" | "Blocked" | "Under Repair" | "Still On Bed/Discharge Approval"
+  patientJson String?     // serialised JSON of active patient info
+  notes       String?
+  cleaningStartedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("beds")
 }

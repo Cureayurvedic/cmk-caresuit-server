@@ -4,6 +4,7 @@ import patientRoutes from "../modules/patients/patient.routes.js";
 import billingRoutes from "../modules/billing/billing.routes.js";
 import reportsRoutes from "../modules/reports/reports.routes.js";
 import atdRoutes from "../modules/atd/atd.routes.js";
+import settingsRoutes from "../modules/settings/settings.routes.js";
 
 const router = Router();
 
@@ -12,7 +13,9 @@ router.use("/patients", patientRoutes);
 router.use("/billing", billingRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/atd", atdRoutes);
+router.use("/settings", settingsRoutes);
 
 export default router;
+
 
 

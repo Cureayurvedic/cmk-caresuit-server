@@ -1,369 +1,277 @@
 import { prisma } from "../../config/database.js";
 import { AppError, NotFoundError } from "../../utils/errors.js";
+import { BedCategoryRepository } from "../settings/bedCategory.repository.js";
 
-// In-memory / persistent bed state initialized to the exact hospital layout
-let HOSPITAL_BEDS = [
-  // DELUXE
-  {
-    id: "bed-dlx-01",
-    bedNo: "DLX-01",
-    category: "DELUXE",
-    ward: "Floor 2 - Deluxe Wing",
-    status: "House Keeping",
-    patient: null,
-    cleaningStartedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    tariffRate: 3500,
-  },
-  {
-    id: "bed-dlx-02",
-    bedNo: "DLX-02",
-    category: "DELUXE",
-    ward: "Floor 2 - Deluxe Wing",
-    status: "Occupied",
-    patient: {
-      uhid: "UHID-2026-00001-2863",
-      ipNo: "IP-2026/00142",
-      name: "Utkarsh Ladla",
-      genderAge: "Male/21 Yr",
-      admissionDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      doctor: "Dr. Abhishek Bansal 2273",
-      department: "Internal Medicine",
-      diagnosis: "Acute Gastroenteritis with Dehydration",
-      billingCategory: "DELUXE ROOM / REGULAR",
-      company: "CASH / CASH",
-      mobile: "4354353453",
-      advancePaid: 5000,
-      runningBill: 12450,
-    },
-    tariffRate: 3500,
-  },
-  { id: "bed-dlx-03", bedNo: "DLX-03", category: "DELUXE", ward: "Floor 2 - Deluxe Wing", status: "Vacant", patient: null, tariffRate: 3500 },
-  { id: "bed-dlx-04", bedNo: "DLX-04", category: "DELUXE", ward: "Floor 2 - Deluxe Wing", status: "Vacant", patient: null, tariffRate: 3500 },
-  { id: "bed-dlx-05", bedNo: "DLX-05", category: "DELUXE", ward: "Floor 2 - Deluxe Wing", status: "Vacant", patient: null, tariffRate: 3500 },
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function parseBed(b) {
+  return {
+    id:                b.id,
+    bedNo:             b.bedNo,
+    category:          b.category?.name  ?? b.categoryName ?? "GENERAL",
+    categoryId:        b.categoryId,
+    ward:              b.category?.ward  ?? "",
+    tariffRate:        b.category?.tariffRate ?? 2000,
+    status:            b.status,
+    patient:           b.patientJson ? JSON.parse(b.patientJson) : null,
+    notes:             b.notes       ?? null,
+    cleaningStartedAt: b.cleaningStartedAt ?? null,
+  };
+}
 
-  // GENERAL WARD
-  {
-    id: "bed-gen-01",
-    bedNo: "GEN-01",
-    category: "GENERAL",
-    ward: "Ground Floor - General Ward",
-    status: "Occupied",
-    patient: {
-      uhid: "UHID-2026-00002-3183",
-      ipNo: "IP-2026/00143",
-      name: "test test test",
-      genderAge: "Male/2 Yr",
-      admissionDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      doctor: "Dr. Sameer Sen 3105",
-      department: "Pediatrics",
-      diagnosis: "Viral Pyrexia with Wheezing",
-      billingCategory: "GENERAL WARD / REGULAR",
-      company: "Star Health Insurance",
-      mobile: "8899889988",
-      advancePaid: 3000,
-      runningBill: 6800,
-    },
-    tariffRate: 1200,
-  },
-  { id: "bed-gen-02", bedNo: "GEN-02", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-  { id: "bed-gen-03", bedNo: "GEN-03", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-  { id: "bed-gen-04", bedNo: "GEN-04", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-  { id: "bed-gen-05", bedNo: "GEN-05", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-  { id: "bed-gen-06", bedNo: "GEN-06", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-  { id: "bed-gen-07", bedNo: "GEN-07", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-  { id: "bed-gen-08", bedNo: "GEN-08", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-  { id: "bed-gen-09", bedNo: "GEN-09", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-  { id: "bed-gen-10", bedNo: "GEN-10", category: "GENERAL", ward: "Ground Floor - General Ward", status: "Vacant", patient: null, tariffRate: 1200 },
-
-  // ICU
-  { id: "bed-icu-01", bedNo: "ICU-01", category: "ICU", ward: "Floor 1 - Critical Care Unit", status: "Vacant", patient: null, tariffRate: 6500 },
-  { id: "bed-icu-02", bedNo: "ICU-02", category: "ICU", ward: "Floor 1 - Critical Care Unit", status: "Vacant", patient: null, tariffRate: 6500 },
-  { id: "bed-icu-03", bedNo: "ICU-03", category: "ICU", ward: "Floor 1 - Critical Care Unit", status: "Vacant", patient: null, tariffRate: 6500 },
-  { id: "bed-icu-04", bedNo: "ICU-04", category: "ICU", ward: "Floor 1 - Critical Care Unit", status: "Vacant", patient: null, tariffRate: 6500 },
-  { id: "bed-icu-05", bedNo: "ICU-05", category: "ICU", ward: "Floor 1 - Critical Care Unit", status: "Vacant", patient: null, tariffRate: 6500 },
-
-  // SINGLE PRIVATE
-  { id: "bed-pvt-01", bedNo: "PRIVATE-01", category: "SINGLE PRIVATE", ward: "Floor 3 - Private Wing", status: "Vacant", patient: null, tariffRate: 4500 },
-  { id: "bed-pvt-02", bedNo: "PRIVATE-02", category: "SINGLE PRIVATE", ward: "Floor 3 - Private Wing", status: "Vacant", patient: null, tariffRate: 4500 },
-  { id: "bed-pvt-03", bedNo: "PRIVATE-03", category: "SINGLE PRIVATE", ward: "Floor 3 - Private Wing", status: "Vacant", patient: null, tariffRate: 4500 },
-  { id: "bed-pvt-04", bedNo: "PRIVATE-04", category: "SINGLE PRIVATE", ward: "Floor 3 - Private Wing", status: "Vacant", patient: null, tariffRate: 4500 },
-  { id: "bed-pvt-05", bedNo: "PRIVATE-05", category: "SINGLE PRIVATE", ward: "Floor 3 - Private Wing", status: "Vacant", patient: null, tariffRate: 4500 },
-
-  // TWIN SHARING
-  { id: "bed-twn-01", bedNo: "TWIN-S-01", category: "TWIN SHARING", ward: "Floor 2 - Twin Sharing", status: "Vacant", patient: null, tariffRate: 2500 },
-  { id: "bed-twn-02", bedNo: "TWIN-S-02", category: "TWIN SHARING", ward: "Floor 2 - Twin Sharing", status: "Vacant", patient: null, tariffRate: 2500 },
-  { id: "bed-twn-03", bedNo: "TWIN-S-03", category: "TWIN SHARING", ward: "Floor 2 - Twin Sharing", status: "Vacant", patient: null, tariffRate: 2500 },
-  { id: "bed-twn-04", bedNo: "TWIN-S-04", category: "TWIN SHARING", ward: "Floor 2 - Twin Sharing", status: "Vacant", patient: null, tariffRate: 2500 },
-  { id: "bed-twn-05", bedNo: "TWIN-S-05", category: "TWIN SHARING", ward: "Floor 2 - Twin Sharing", status: "Vacant", patient: null, tariffRate: 2500 },
-];
+async function findBed(bedNoOrId) {
+  const byNo = await prisma.bed.findUnique({ where: { bedNo: bedNoOrId },    include: { category: true } });
+  if (byNo) return byNo;
+  return  await prisma.bed.findUnique({ where: { id: bedNoOrId },            include: { category: true } });
+}
 
 export class AtdService {
   // ─── LIST BEDS & FILTER MATRIX ───────────────────────────────────────────────
   static async listBeds(queryParams = {}) {
     const { category, status, search } = queryParams;
-    let filtered = [...HOSPITAL_BEDS];
 
+    // Auto-seed defaults on very first call if DB is empty
+    const totalBeds = await prisma.bed.count();
+    if (totalBeds === 0) {
+      await BedCategoryRepository.seedDefaults();
+    }
+
+    const where = {};
     if (category && category !== "All" && category !== "all") {
-      filtered = filtered.filter((b) => b.category.toUpperCase() === category.toUpperCase());
+      where.category = { name: { equals: category.toUpperCase(), mode: "insensitive" } };
     }
-
     if (status && status !== "All" && status !== "all") {
-      filtered = filtered.filter((b) => b.status.toLowerCase() === status.toLowerCase());
+      where.status = { equals: status, mode: "insensitive" };
     }
-
     if (search && search.trim()) {
-      const q = search.trim().toLowerCase();
-      filtered = filtered.filter((b) => {
-        if (b.bedNo.toLowerCase().includes(q)) return true;
-        if (b.category.toLowerCase().includes(q)) return true;
-        if (b.patient) {
-          if (b.patient.name.toLowerCase().includes(q)) return true;
-          if (b.patient.uhid.toLowerCase().includes(q)) return true;
-          if (b.patient.ipNo.toLowerCase().includes(q)) return true;
-          if (b.patient.doctor.toLowerCase().includes(q)) return true;
-          if (b.patient.company.toLowerCase().includes(q)) return true;
-        }
-        return false;
-      });
+      const q = search.trim();
+      where.OR = [
+        { bedNo:        { contains: q, mode: "insensitive" } },
+        { patientJson:  { contains: q, mode: "insensitive" } },
+        { category: { name: { contains: q, mode: "insensitive" } } },
+      ];
     }
 
-    // Compute live status counts across whole hospital
+    const beds = await prisma.bed.findMany({
+      where,
+      include: { category: true },
+      orderBy: [{ category: { sortOrder: "asc" } }, { bedNo: "asc" }],
+    });
+
+    const allBeds = await prisma.bed.findMany({ select: { status: true } });
     const counts = {
-      vacant: HOSPITAL_BEDS.filter((b) => b.status === "Vacant").length,
-      occupied: HOSPITAL_BEDS.filter((b) => b.status === "Occupied").length,
-      houseKeeping: HOSPITAL_BEDS.filter((b) => b.status === "House Keeping").length,
-      retain: HOSPITAL_BEDS.filter((b) => b.status === "Retain").length,
-      blocked: HOSPITAL_BEDS.filter((b) => b.status === "Blocked").length,
-      underRepair: HOSPITAL_BEDS.filter((b) => b.status === "Under Repair").length,
-      stillOnBed: HOSPITAL_BEDS.filter((b) => b.status === "Still On Bed/Discharge Approval").length,
-      total: HOSPITAL_BEDS.length,
+      vacant:      allBeds.filter((b) => b.status === "Vacant").length,
+      occupied:    allBeds.filter((b) => b.status === "Occupied").length,
+      houseKeeping:allBeds.filter((b) => b.status === "House Keeping").length,
+      retain:      allBeds.filter((b) => b.status === "Retain").length,
+      blocked:     allBeds.filter((b) => b.status === "Blocked").length,
+      underRepair: allBeds.filter((b) => b.status === "Under Repair").length,
+      stillOnBed:  allBeds.filter((b) => b.status === "Still On Bed/Discharge Approval").length,
+      total:       allBeds.length,
     };
 
-    return {
-      beds: filtered,
-      counts,
-    };
+    return { beds: beds.map(parseBed), counts };
   }
 
   // ─── ADMIT PATIENT TO BED ───────────────────────────────────────────────────
   static async admitPatient(data) {
     const {
-      bedId,
-      bedNo,
-      uhid,
-      patientName,
-      bookingNo = "",
-      ipNo: customIpNo,
+      bedId, bedNo, uhid, patientName,
+      bookingNo = "", ipNo: customIpNo,
       admittingTeam = "General Medicine Team A",
       treatingConsultant = "Dr. Abhishek Bansal 2273",
       admittingDoctor = "Dr. Abhishek Bansal 2273",
-      secondaryDoctor = "",
-      referType = "Internal Provider",
-      referBy = "Self",
-      admissionType = "Elective",
-      ward,
-      bedCategory,
-      billingCategory = "REGULAR",
+      secondaryDoctor = "", referType = "Internal Provider",
+      referBy = "Self", admissionType = "Elective",
+      ward, bedCategory, billingCategory = "REGULAR",
       expectedDischargeDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-      minAdvRequire = 0,
-      estimatedAmt = 0,
-      mlc = false,
-      handleWithCare = false,
-      source = "Direct Patient",
-      payerType = "Direct Patient",
-      payer = "CASH / CASH",
-      sponsor = "",
-      insuranceCompany = "",
-      kinDetails = {},
-      advancePaid = 0,
+      minAdvRequire = 0, estimatedAmt = 0,
+      mlc = false, handleWithCare = false,
+      source = "Direct Patient", payerType = "Direct Patient",
+      payer = "CASH / CASH", sponsor = "", insuranceCompany = "",
+      kinDetails = {}, advancePaid = 0,
     } = data;
 
-    const targetBed = HOSPITAL_BEDS.find((b) => b.id === bedId || b.bedNo === bedNo);
-    if (!targetBed) {
-      throw new NotFoundError(`Bed with ID/No ${bedId || bedNo} not found.`);
-    }
+    const targetBed = await findBed(bedId || bedNo);
+    if (!targetBed) throw new NotFoundError(`Bed with ID/No ${bedId || bedNo} not found.`);
+    if (targetBed.status === "Occupied") throw new AppError(`Bed ${targetBed.bedNo} is already occupied.`, 400);
 
-    if (targetBed.status === "Occupied") {
-      throw new AppError(`Bed ${targetBed.bedNo} is already occupied.`, 400);
-    }
+    const occupiedCount = await prisma.bed.count({ where: { status: "Occupied" } });
+    const ipNo = customIpNo || `IP-${new Date().getFullYear()}/${(occupiedCount + 144).toString()}`;
 
-    const ipNo = customIpNo || `IP-${new Date().getFullYear()}/${(HOSPITAL_BEDS.filter((b) => b.patient).length + 144).toString()}`;
-
-    targetBed.status = "Occupied";
-    targetBed.patient = {
-      uhid: uhid || `UHID-${new Date().getFullYear()}-0000${Math.floor(Math.random() * 89) + 10}`,
+    const patient = {
+      uhid:            uhid || `UHID-${new Date().getFullYear()}-0000${Math.floor(Math.random() * 89) + 10}`,
       ipNo,
-      bookingNo: bookingNo || `BKG-${Math.floor(Math.random() * 89999) + 10000}`,
-      name: patientName || "Admitted Patient",
-      genderAge: `${kinDetails.gender || "Male"}/${kinDetails.dob ? "30 Yr" : "35 Yr"}`,
-      admissionDate: new Date().toISOString(),
-      admittingTeam,
-      treatingConsultant,
-      doctor: admittingDoctor || treatingConsultant,
-      secondaryDoctor,
-      referType,
-      referBy,
-      admissionType,
-      ward: ward || targetBed.ward,
-      category: bedCategory || targetBed.category,
-      billingCategory: `${targetBed.category} / ${billingCategory}`,
+      bookingNo:       bookingNo || `BKG-${Math.floor(Math.random() * 89999) + 10000}`,
+      name:            patientName || "Admitted Patient",
+      genderAge:       `${kinDetails.gender || "Male"}/${kinDetails.dob ? "30 Yr" : "35 Yr"}`,
+      admissionDate:   new Date().toISOString(),
+      admittingTeam,   treatingConsultant,
+      doctor:          admittingDoctor || treatingConsultant,
+      secondaryDoctor, referType, referBy, admissionType,
+      ward:            ward || targetBed.category.ward,
+      category:        bedCategory || targetBed.category.name,
+      billingCategory: `${targetBed.category.name} / ${billingCategory}`,
       expectedDischargeDate,
-      minAdvRequire: Number(minAdvRequire || 0),
-      estimatedAmt: Number(estimatedAmt || 0),
-      mlc: Boolean(mlc),
-      handleWithCare: Boolean(handleWithCare),
-      source,
-      payerType,
-      company: payer || "CASH / CASH",
-      sponsor,
-      insuranceCompany,
-      kinDetails,
-      mobile: kinDetails.mobile || "9876543210",
-      advancePaid: Number(advancePaid || minAdvRequire || targetBed.tariffRate || 0),
-      runningBill: Number(targetBed.tariffRate || 2000),
+      minAdvRequire:   Number(minAdvRequire || 0),
+      estimatedAmt:    Number(estimatedAmt || 0),
+      mlc:             Boolean(mlc),
+      handleWithCare:  Boolean(handleWithCare),
+      source, payerType,
+      company:         payer || "CASH / CASH",
+      sponsor, insuranceCompany, kinDetails,
+      mobile:          kinDetails.mobile || "9876543210",
+      advancePaid:     Number(advancePaid || minAdvRequire || targetBed.category.tariffRate || 0),
+      runningBill:     Number(targetBed.category.tariffRate || 2000),
     };
 
-    // Update patient status in database if exists
-    try {
-      await prisma.patient.updateMany({
-        where: { uhid: targetBed.patient.uhid },
-        data: {
-          status: "Open",
-          occupation: targetBed.bedNo,
-          registrationType: "Inpatient",
-        },
-      });
-    } catch {
-      // Non-blocking
-    }
+    const updated = await prisma.bed.update({
+      where: { id: targetBed.id },
+      data:  { status: "Occupied", patientJson: JSON.stringify(patient) },
+      include: { category: true },
+    });
 
-    return targetBed;
+    // Update patient status in DB (non-blocking)
+    prisma.patient.updateMany({ where: { uhid: patient.uhid }, data: { status: "Open", registrationType: "Inpatient" } }).catch(() => {});
+
+    return parseBed(updated);
   }
 
   // ─── TRANSFER PATIENT TO ANOTHER BED ────────────────────────────────────────
   static async transferPatient(data) {
     const { fromBedNo, toBedNo, reason = "Medical condition upgrade" } = data;
 
-    const sourceBed = HOSPITAL_BEDS.find((b) => b.bedNo === fromBedNo);
-    const targetBed = HOSPITAL_BEDS.find((b) => b.bedNo === toBedNo);
+    const sourceBed = await findBed(fromBedNo);
+    const targetBed = await findBed(toBedNo);
 
-    if (!sourceBed || !sourceBed.patient) {
-      throw new AppError(`Source bed ${fromBedNo} has no active admitted patient.`, 400);
-    }
+    if (!sourceBed || !sourceBed.patientJson) throw new AppError(`Source bed ${fromBedNo} has no active admitted patient.`, 400);
+    if (!targetBed)                            throw new NotFoundError(`Target bed ${toBedNo} not found.`);
+    if (targetBed.status === "Occupied")       throw new AppError(`Target bed ${toBedNo} is already occupied.`, 400);
 
-    if (!targetBed) {
-      throw new NotFoundError(`Target bed ${toBedNo} not found.`);
-    }
+    const patient = JSON.parse(sourceBed.patientJson);
+    patient.billingCategory = `${targetBed.category?.name || "GENERAL"} / REGULAR`;
 
-    if (targetBed.status === "Occupied") {
-      throw new AppError(`Target bed ${toBedNo} is already occupied.`, 400);
-    }
+    await prisma.$transaction([
+      prisma.bed.update({ where: { id: targetBed.id }, data: { status: "Occupied", patientJson: JSON.stringify(patient) } }),
+      prisma.bed.update({ where: { id: sourceBed.id }, data: { status: "House Keeping", patientJson: null, cleaningStartedAt: new Date() } }),
+    ]);
 
-    const patient = { ...sourceBed.patient };
-    patient.billingCategory = `${targetBed.category} / REGULAR`;
-
-    // Move patient
-    targetBed.status = "Occupied";
-    targetBed.patient = patient;
-
-    // Set source bed to House Keeping for sanitation
-    sourceBed.status = "House Keeping";
-    sourceBed.patient = null;
-    sourceBed.cleaningStartedAt = new Date().toISOString();
-
-    // Update patient record bed assignment
-    try {
-      await prisma.patient.updateMany({
-        where: { uhid: patient.uhid },
-        data: { occupation: targetBed.bedNo },
-      });
-    } catch {
-      // Non-blocking
-    }
+    prisma.patient.updateMany({ where: { uhid: patient.uhid }, data: { occupation: toBedNo } }).catch(() => {});
 
     return {
-      sourceBed,
-      targetBed,
-      message: `Patient ${patient.name} successfully transferred from ${fromBedNo} to ${toBedNo}. Reason: ${reason}`,
+      sourceBed: parseBed({ ...sourceBed, status: "House Keeping", patientJson: null }),
+      targetBed: parseBed({ ...targetBed, status: "Occupied",      patientJson: JSON.stringify(patient) }),
+      message: `Patient ${patient.name} transferred from ${fromBedNo} to ${toBedNo}. Reason: ${reason}`,
     };
   }
 
-  // ─── INITIATE DISCHARGE / MARK FOR DISCHARGE ────────────────────────────────
+  // ─── INITIATE DISCHARGE ──────────────────────────────────────────────────────
   static async initiateDischarge(data) {
     const { bedNo, dischargeNotes = "Recovered and fit for discharge" } = data;
-    const targetBed = HOSPITAL_BEDS.find((b) => b.bedNo === bedNo);
+    const targetBed = await findBed(bedNo);
+    if (!targetBed || !targetBed.patientJson) throw new AppError(`Bed ${bedNo} has no active admitted patient.`, 400);
 
-    if (!targetBed || !targetBed.patient) {
-      throw new AppError(`Bed ${bedNo} has no active admitted patient.`, 400);
-    }
+    const updated = await prisma.bed.update({
+      where:   { id: targetBed.id },
+      data:    { status: "Still On Bed/Discharge Approval", notes: dischargeNotes },
+      include: { category: true },
+    });
 
-    // Set status to Still On Bed / Discharge Approval
-    targetBed.status = "Still On Bed/Discharge Approval";
-    targetBed.dischargeInitiatedAt = new Date().toISOString();
-    targetBed.dischargeNotes = dischargeNotes;
+    const patient = JSON.parse(targetBed.patientJson);
+    prisma.patient.updateMany({ where: { uhid: patient.uhid }, data: { status: "Marked For Discharged" } }).catch(() => {});
 
-    // Update patient status in DB
-    try {
-      await prisma.patient.updateMany({
-        where: { uhid: targetBed.patient.uhid },
-        data: { status: "Marked For Discharged" },
-      });
-    } catch {
-      // Non-blocking
-    }
-
-    return targetBed;
+    return parseBed(updated);
   }
 
-  // ─── COMPLETE DISCHARGE & SEND BED TO HOUSEKEEPING ──────────────────────────
+  // ─── COMPLETE DISCHARGE ──────────────────────────────────────────────────────
   static async completeDischarge(data) {
     const { bedNo } = data;
-    const targetBed = HOSPITAL_BEDS.find((b) => b.bedNo === bedNo);
+    const targetBed = await findBed(bedNo);
+    if (!targetBed) throw new NotFoundError(`Bed ${bedNo} not found.`);
 
-    if (!targetBed) {
-      throw new NotFoundError(`Bed ${bedNo} not found.`);
-    }
+    const patient = targetBed.patientJson ? JSON.parse(targetBed.patientJson) : null;
 
-    const patient = targetBed.patient;
-    targetBed.status = "House Keeping";
-    targetBed.patient = null;
-    targetBed.cleaningStartedAt = new Date().toISOString();
+    const updated = await prisma.bed.update({
+      where:   { id: targetBed.id },
+      data:    { status: "House Keeping", patientJson: null, cleaningStartedAt: new Date(), notes: null },
+      include: { category: true },
+    });
 
     if (patient) {
-      try {
-        await prisma.patient.updateMany({
-          where: { uhid: patient.uhid },
-          data: { status: "Discharged" },
-        });
-      } catch {
-        // Non-blocking
-      }
+      prisma.patient.updateMany({ where: { uhid: patient.uhid }, data: { status: "Discharged" } }).catch(() => {});
     }
 
-    return targetBed;
+    return parseBed(updated);
   }
 
-  // ─── UPDATE BED STATUS (E.G. HOUSEKEEPING -> VACANT, BLOCKED, UNDER REPAIR) ──
+  // ─── UPDATE BED STATUS ───────────────────────────────────────────────────────
   static async updateBedStatus(data) {
     const { bedNo, status, notes = "" } = data;
-    const targetBed = HOSPITAL_BEDS.find((b) => b.bedNo === bedNo);
+    const targetBed = await findBed(bedNo);
+    if (!targetBed) throw new NotFoundError(`Bed ${bedNo} not found.`);
 
-    if (!targetBed) {
-      throw new NotFoundError(`Bed ${bedNo} not found.`);
+    const updateData = { status };
+    if (status === "Vacant")        { updateData.patientJson = null; updateData.cleaningStartedAt = null; }
+    if (status === "House Keeping") { updateData.cleaningStartedAt = new Date(); }
+    if (notes)                      { updateData.notes = notes; }
+
+    const updated = await prisma.bed.update({ where: { id: targetBed.id }, data: updateData, include: { category: true } });
+    return parseBed(updated);
+  }
+
+  // ─── ADD NEW BED OR BULK BEDS ───────────────────────────────────────────────
+  static async addBed(data) {
+    const { bedNo, category, ward, tariffRate = 2000, status = "Vacant", bulkCount, prefix, startNumber } = data;
+
+    // Find or create the category
+    let cat = await prisma.bedCategory.findFirst({ where: { name: { equals: (category || "GENERAL").toUpperCase(), mode: "insensitive" } } });
+    if (!cat) {
+      cat = await prisma.bedCategory.create({
+        data: {
+          name:      (category || "GENERAL").toUpperCase(),
+          prefix:    (prefix || "BED").toUpperCase(),
+          ward:      ward || "General Ward",
+          tariffRate: Number(tariffRate),
+          totalBeds: 0,
+          sortOrder: 99,
+        },
+      });
     }
 
-    if (status === "Vacant") {
-      targetBed.status = "Vacant";
-      targetBed.patient = null;
-      targetBed.cleaningStartedAt = null;
-    } else if (status === "House Keeping") {
-      targetBed.status = "House Keeping";
-      targetBed.cleaningStartedAt = new Date().toISOString();
-    } else if (status === "Blocked" || status === "Under Repair" || status === "Retain") {
-      targetBed.status = status;
-      targetBed.notes = notes;
+    if (bulkCount && parseInt(bulkCount, 10) > 1) {
+      const count = parseInt(bulkCount, 10);
+      const start = parseInt(startNumber, 10) || 1;
+      const pref  = (prefix || cat.prefix).toUpperCase();
+      const created = [];
+      for (let i = 0; i < count; i++) {
+        const num = String(start + i).padStart(2, "0");
+        const bNo = `${pref}-${num}`;
+        try {
+          const b = await prisma.bed.create({ data: { bedNo: bNo, categoryId: cat.id, status: "Vacant" }, include: { category: true } });
+          created.push(parseBed(b));
+        } catch { /* skip duplicates */ }
+      }
+      await prisma.bedCategory.update({ where: { id: cat.id }, data: { totalBeds: { increment: created.length } } });
+      return { addedCount: created.length, beds: created };
     }
 
-    return targetBed;
+    if (!bedNo) throw new AppError("Bed number is required", 400);
+
+    const b = await prisma.bed.create({
+      data:    { bedNo: bedNo.toUpperCase(), categoryId: cat.id, status: status || "Vacant" },
+      include: { category: true },
+    });
+    await prisma.bedCategory.update({ where: { id: cat.id }, data: { totalBeds: { increment: 1 } } });
+    return parseBed(b);
+  }
+
+  // ─── DELETE BED ─────────────────────────────────────────────────────────────
+  static async deleteBed(bedNo) {
+    const targetBed = await findBed(bedNo);
+    if (!targetBed) throw new NotFoundError(`Bed ${bedNo} not found.`);
+    if (targetBed.status === "Occupied") throw new AppError(`Cannot delete Bed ${bedNo} while it is occupied.`, 400);
+
+    await prisma.bed.delete({ where: { id: targetBed.id } });
+    await prisma.bedCategory.update({ where: { id: targetBed.categoryId }, data: { totalBeds: { decrement: 1 } } });
+    return parseBed(targetBed);
   }
 }

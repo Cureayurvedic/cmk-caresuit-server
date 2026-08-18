@@ -28,6 +28,7 @@ export const createPatientSchema = z.object({
   pinCode: z.preprocess(sanitizeDigits, z.string().regex(/^\d{6}$/, "PIN code must be exactly 6 digits").optional().or(z.literal(""))),
   altPhone: z.preprocess(sanitizeDigits, z.string().regex(/^\d{10}$/, "Alternative phone must be exactly 10 digits").optional().or(z.literal(""))),
   email: z.string().email("Invalid email format").optional().or(z.literal("")),
+  photoUrl: z.string().optional().or(z.literal("")),
   
   // Emergency
   emergencyName: z.string().regex(/^[A-Za-z\s]*$/, "Only alphabets are allowed in emergency name").optional().or(z.literal("")),
