@@ -322,19 +322,36 @@ export class BillingService {
       payerType,
       fromDate,
       toDate,
+      page = 1,
       limit = 100,
+      email,
+      address,
+      payer,
+      fullName,
+      guardianName,
+      mobile,
+      dateOfBirth,
     } = queryParams;
 
     const filter = {};
+    const AND = [];
 
-    if (gender && gender !== "all") {
-      filter.gender = { equals: gender, mode: "insensitive" };
-    }
-    if (payerType && payerType !== "Select All" && payerType !== "all") {
-      filter.payerType = { contains: payerType, mode: "insensitive" };
-    }
-    if (status && status !== "all") {
-      filter.status = status;
+    if (gender && gender !== "all") filter.gender = { equals: gender, mode: "insensitive" };
+    if (payerType && payerType !== "Select All" && payerType !== "all") filter.payerType = { contains: payerType, mode: "insensitive" };
+    if (status && status !== "all") filter.status = status;
+
+    if (email) filter.email = { contains: email, mode: "insensitive" };
+    if (address) filter.address = { contains: address, mode: "insensitive" };
+    if (payer) filter.payer = { contains: payer, mode: "insensitive" };
+    if (fullName) filter.fullName = { contains: fullName, mode: "insensitive" };
+    if (guardianName) filter.guardianName = { contains: guardianName, mode: "insensitive" };
+    if (mobile) filter.mobile = { contains: mobile, mode: "insensitive" };
+    if (dateOfBirth) {
+      const dob = new Date(dateOfBirth);
+      filter.dateOfBirth = {
+        gte: new Date(dob.setHours(0, 0, 0, 0)),
+        lte: new Date(dob.setHours(23, 59, 59, 999))
+      };
     }
 
     if (search && search.trim()) {
@@ -350,14 +367,36 @@ export class BillingService {
       } else if (searchOn === "Company") {
         filter.payer = { contains: term, mode: "insensitive" };
       } else {
-        filter.OR = [
-          { fullName: { contains: term, mode: "insensitive" } },
-          { uhid: { contains: term, mode: "insensitive" } },
-          { mobile: { contains: term, mode: "insensitive" } },
-          { guardianName: { contains: term, mode: "insensitive" } },
-          { referredBy: { contains: term, mode: "insensitive" } },
-          { payer: { contains: term, mode: "insensitive" } },
-        ];
+        AND.push({
+          OR: [
+            { fullName: { contains: term, mode: "insensitive" } },
+            { uhid: { contains: term, mode: "insensitive" } },
+            { mobile: { contains: term, mode: "insensitive" } },
+            { guardianName: { contains: term, mode: "insensitive" } },
+            { referredBy: { contains: term, mode: "insensitive" } },
+            { payer: { contains: term, mode: "insensitive" } },
+          ]
+        });
+      }
+    }
+
+    if (type && type !== "all" && type !== "Both") {
+      if (type === "Registration") {
+        AND.push({
+          OR: [
+            { registrationType: "Outpatient" },
+            { status: "Registration" }
+          ]
+        });
+      } else if (type === "Discharge") {
+        filter.status = "Discharged";
+      } else if (type === "Discharge But Not Bill") {
+        filter.status = "Discharge But Not Bill";
+      } else if (type === "Admission") {
+        filter.registrationType = { not: "Outpatient" };
+        AND.push({
+          status: { notIn: ["Registration", "Discharged", "Discharge But Not Bill"] }
+        });
       }
     }
 
@@ -366,12 +405,22 @@ export class BillingService {
       if (fromDate) filter.regDate.gte = new Date(fromDate);
       if (toDate) filter.regDate.lte = new Date(toDate);
     }
+    
+    if (AND.length > 0) {
+      filter.AND = AND;
+    }
 
-    const patients = await prisma.patient.findMany({
-      where: filter,
-      orderBy: { createdAt: "desc" },
-      take: Number(limit),
-    });
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const [totalCount, patients] = await prisma.$transaction([
+      prisma.patient.count({ where: filter }),
+      prisma.patient.findMany({
+        where: filter,
+        orderBy: { createdAt: "desc" },
+        take: Number(limit),
+        skip,
+      })
+    ]);
 
     const mapped = patients.map((p) => {
       let patientType = "Admission";
@@ -398,15 +447,12 @@ export class BillingService {
         isVip: p.isVip || false,
         payerType: p.payerType || "Direct Patient",
         sponsor: p.sponsor || "CASH",
+        dateOfBirth: p.dateOfBirth ? p.dateOfBirth.toISOString() : "",
+        photoUrl: p.photoUrl || null,
       };
     });
 
-    const effectiveType = type;
-    const filtered = (effectiveType && effectiveType !== "all" && effectiveType !== "Both")
-      ? mapped.filter(p => p.type === effectiveType)
-      : mapped;
-
-    return filtered;
+    return { patients: mapped, totalCount };
   }
 
   static async getInvoiceById(id) {
@@ -978,6 +1024,8 @@ export class BillingService {
       reason,
       fromDate,
       toDate,
+      page,
+      limit,
     } = queryParams;
     const filter = {};
 
@@ -1011,10 +1059,28 @@ export class BillingService {
       ];
     }
 
-    return await prisma.creditNote.findMany({
-      where: filter,
-      orderBy: { createdAt: "desc" },
-    });
+    if (page && limit) {
+      const parsedPage = parseInt(page, 10) || 1;
+      const parsedLimit = parseInt(limit, 10) || 10;
+      const skip = (parsedPage - 1) * parsedLimit;
+      
+      const [totalCount, creditNotes] = await prisma.$transaction([
+        prisma.creditNote.count({ where: filter }),
+        prisma.creditNote.findMany({
+          where: filter,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: parsedLimit,
+        }),
+      ]);
+      return { creditNotes, totalCount };
+    } else {
+      const creditNotes = await prisma.creditNote.findMany({
+        where: filter,
+        orderBy: { createdAt: "desc" },
+      });
+      return { creditNotes, totalCount: creditNotes.length };
+    }
   }
 
   static async createCreditNote(data) {

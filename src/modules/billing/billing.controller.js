@@ -34,11 +34,11 @@ export class BillingController {
 
   // Patients for Census / Lookup
   static listPatients = asyncHandler(async (req, res) => {
-    const patients = await BillingService.listPatients(req.query);
+    const result = await BillingService.listPatients(req.query);
     res.status(200).json({
       success: true,
       message: "Billing patients retrieved successfully",
-      data: { patients },
+      data: result,
     });
   });
 
@@ -146,11 +146,11 @@ export class BillingController {
 
   // Credit Notes
   static listCreditNotes = asyncHandler(async (req, res) => {
-    const creditNotes = await BillingService.listCreditNotes(req.query);
+    const result = await BillingService.listCreditNotes(req.query);
     res.status(200).json({
       success: true,
       message: "Credit notes retrieved successfully",
-      data: { creditNotes },
+      data: result,
     });
   });
 

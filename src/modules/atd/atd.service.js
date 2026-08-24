@@ -57,6 +57,29 @@ export class AtdService {
       orderBy: [{ category: { sortOrder: "asc" } }, { bedNo: "asc" }],
     });
 
+    // Auto-cleanup any duplicate patient allocations across active beds
+    const seenPatientKeys = new Set();
+    for (const b of beds) {
+      if ((b.status === "Occupied" || b.status === "Still On Bed/Discharge Approval") && b.patientJson) {
+        try {
+          const p = JSON.parse(b.patientJson);
+          const pName = (p.name || "").replace(/\s*\(Patient\)\s*/i, "").trim().toLowerCase();
+          const pKey = p.uhid ? p.uhid.toLowerCase() : pName;
+          if (pKey && seenPatientKeys.has(pKey)) {
+            // Duplicate found! Reset duplicate bed to Vacant
+            await prisma.bed.update({
+              where: { id: b.id },
+              data: { status: "Vacant", patientJson: null },
+            });
+            b.status = "Vacant";
+            b.patientJson = null;
+          } else if (pKey) {
+            seenPatientKeys.add(pKey);
+          }
+        } catch (err) {}
+      }
+    }
+
     const allBeds = await prisma.bed.findMany({ select: { status: true } });
     const counts = {
       vacant:      allBeds.filter((b) => b.status === "Vacant").length,
@@ -94,6 +117,35 @@ export class AtdService {
     const targetBed = await findBed(bedId || bedNo);
     if (!targetBed) throw new NotFoundError(`Bed with ID/No ${bedId || bedNo} not found.`);
     if (targetBed.status === "Occupied") throw new AppError(`Bed ${targetBed.bedNo} is already occupied.`, 400);
+
+    // Prevent single patient from occupying multiple beds simultaneously
+    const activeBeds = await prisma.bed.findMany({
+      where: {
+        status: { in: ["Occupied", "Still On Bed/Discharge Approval"] },
+        patientJson: { not: null },
+      },
+    });
+
+    const activeOccupant = activeBeds.find((b) => {
+      if (!b.patientJson) return false;
+      try {
+        const p = JSON.parse(b.patientJson);
+        const uMatch = uhid && p.uhid && p.uhid.toLowerCase() === uhid.toLowerCase();
+        const cleanPName = (patientName || "").replace(/\s*\(Patient\)\s*/i, "").trim().toLowerCase();
+        const cleanBName = (p.name || "").replace(/\s*\(Patient\)\s*/i, "").trim().toLowerCase();
+        const nMatch = cleanPName && cleanBName && cleanPName === cleanBName;
+        return uMatch || nMatch;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (activeOccupant) {
+      throw new AppError(
+        `Patient (${patientName || uhid}) is already admitted in Bed ${activeOccupant.bedNo}. A single patient cannot occupy multiple beds simultaneously.`,
+        400
+      );
+    }
 
     const occupiedCount = await prisma.bed.count({ where: { status: "Occupied" } });
     const ipNo = customIpNo || `IP-${new Date().getFullYear()}/${(occupiedCount + 144).toString()}`;

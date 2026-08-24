@@ -16,6 +16,14 @@ export const DEFAULT_VALUES = {
     "Star Health Insurance", "Niva Bupa Health Insurance", "Care Health Insurance",
     "HDFC ERGO", "ICICI Lombard", "Aditya Birla Health", "LIC of India"
   ],
+  doctors: [
+    "Dr. Abhishek Bansal 2273",
+    "Dr. Sameer Sen 3105",
+    "Dr. Rajesh Malhotra 1104",
+    "Dr. D K DAS 2268",
+    "Dr. Sania Mirza 2231"
+  ],
+  payers: ["CASH", "Star Health Insurance", "HDFC ERGO Health", "Niva Bupa"],
 };
 
 export const VALID_CATEGORIES = Object.keys(DEFAULT_VALUES);
