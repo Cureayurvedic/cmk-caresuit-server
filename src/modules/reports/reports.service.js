@@ -212,11 +212,15 @@ export class ReportsService {
 
   // ─── ADMISSION, DISCHARGE & ATD CENSUS REPORT ────────────────────────────────
   static async getAtdCensusReport(queryParams = {}) {
-    const { fromDate, toDate, status } = queryParams;
+    const { fromDate, toDate, status, location } = queryParams;
     const filter = {};
 
     if (status && status !== "all") {
       filter.status = status;
+    }
+
+    if (location && location !== "-- ALL --") {
+      filter.hcf = location;
     }
 
     const patients = await prisma.patient.findMany({
@@ -248,6 +252,7 @@ export class ReportsService {
         status: p.status || "Open",
         company: p.payer || "CASH / CASH",
         regDate: p.regDate || p.createdAt,
+        hcf: p.hcf || "CMK Main",
       })),
     };
   }
