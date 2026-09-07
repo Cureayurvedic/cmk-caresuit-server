@@ -41,7 +41,7 @@ export const createPatientSchema = z.object({
   panNo: z.preprocess(sanitizePan, z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN format").optional().or(z.literal(""))),
   
   // Payer
-  payerType: z.string().min(1, "Payer type is required"),
+  payerType: z.string().optional().or(z.literal("")).default("direct"),
   payer: z.string().optional().or(z.literal("")),
   sponsor: z.string().optional().or(z.literal("")),
   

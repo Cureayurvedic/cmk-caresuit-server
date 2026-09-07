@@ -68,6 +68,16 @@ export class PatientService {
       patientData.uhid = `UHID-${year}-${seq}-${rand}`;
     }
 
+    if (!patientData.payerType) {
+      patientData.payerType = "direct";
+    }
+    if (!patientData.payer) {
+      patientData.payer = "CASH";
+    }
+    if (!patientData.status) {
+      patientData.status = "Active";
+    }
+
     return await PatientRepository.create(patientData);
   }
 

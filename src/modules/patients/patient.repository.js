@@ -1,9 +1,24 @@
 import { prisma } from "../../config/database.js";
 
 export class PatientRepository {
-  static async findAndCountAll({ search, page = 1, limit = 20, uhid, patientName, dob, mobile, phone, email, company, identityNo, address }) {
+  static async findAndCountAll({ search, page = 1, limit = 20, uhid, patientName, dob, mobile, phone, email, company, identityNo, address, hcf, branch }) {
     const filter = {};
     const AND = [];
+
+    const targetBranch = hcf || branch;
+    if (targetBranch) {
+      if (targetBranch.toLowerCase() === "cmk main") {
+        AND.push({
+          OR: [
+            { hcf: { equals: "CMK Main", mode: "insensitive" } },
+            { hcf: { equals: null } },
+            { hcf: { equals: "" } },
+          ]
+        });
+      } else {
+        AND.push({ hcf: { equals: targetBranch, mode: "insensitive" } });
+      }
+    }
 
     if (search) {
       AND.push({
@@ -31,10 +46,6 @@ export class PatientRepository {
       });
     }
 
-    // Since dob in DB is DateTime, we can do a loose string search if we had a string field,
-    // but Prisma doesn't support contains on DateTime easily.
-    // We'll skip dob filtering for now or just parse it if it's exact.
-    
     if (AND.length > 0) {
       filter.AND = AND;
     }
