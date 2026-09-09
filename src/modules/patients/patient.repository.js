@@ -2,11 +2,13 @@ import { prisma } from "../../config/database.js";
 
 export class PatientRepository {
   static async findAndCountAll({ search, page = 1, limit = 20, uhid, patientName, dob, mobile, phone, email, company, identityNo, address, hcf, branch }) {
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 20;
     const filter = {};
     const AND = [];
 
     const targetBranch = hcf || branch;
-    if (targetBranch) {
+    if (targetBranch && targetBranch.toLowerCase() !== "all") {
       if (targetBranch.toLowerCase() === "cmk main") {
         AND.push({
           OR: [
@@ -50,15 +52,15 @@ export class PatientRepository {
       filter.AND = AND;
     }
 
-    const skip = (page - 1) * limit;
+    const skip = (pageNum - 1) * limitNum;
 
     // Run parallel transactions for patient records list and total count
     const [patients, total] = await prisma.$transaction([
       prisma.patient.findMany({
         where: filter,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ regDate: "desc" }, { createdAt: "desc" }],
         skip,
-        take: limit,
+        take: limitNum,
       }),
       prisma.patient.count({ where: filter }),
     ]);

@@ -180,13 +180,21 @@ export class PatientService {
 
         const fullName = p.fullName || [firstName, middleName, lastName].filter(Boolean).join(" ");
 
-        let dob = null;
-        if (p.dob) {
-          const d = new Date(p.dob);
-          if (!isNaN(d.getTime())) {
-            dob = d;
+        const parseDate = (val) => {
+          if (!val) return null;
+          if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+          const s = String(val).trim();
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+            const [d, m, y] = s.split("/").map(Number);
+            const dt = new Date(y, m - 1, d);
+            return isNaN(dt.getTime()) ? null : dt;
           }
-        }
+          const dt = new Date(s);
+          return isNaN(dt.getTime()) ? null : dt;
+        };
+
+        let dob = parseDate(p.dob);
+        let regDate = parseDate(p.regDate) || new Date();
 
         let age = null;
         if (p.age !== undefined && p.age !== null) {
@@ -208,7 +216,7 @@ export class PatientService {
           age,
           guardianName,
           guardianRelation: p.guardianRelation || "Self",
-          regDate: p.regDate ? new Date(p.regDate) : new Date(),
+          regDate,
           mobile: String(mobile),
           address: String(address),
           country: p.country || "India",
