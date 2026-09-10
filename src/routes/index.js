@@ -5,6 +5,7 @@ import billingRoutes from "../modules/billing/billing.routes.js";
 import reportsRoutes from "../modules/reports/reports.routes.js";
 import atdRoutes from "../modules/atd/atd.routes.js";
 import settingsRoutes from "../modules/settings/settings.routes.js";
+import usersRoutes from "../modules/users/users.routes.js";
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.use("/billing", billingRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/atd", atdRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/users", usersRoutes);
 
 export default router;
 
