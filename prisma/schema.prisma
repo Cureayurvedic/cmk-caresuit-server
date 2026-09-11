@@ -9,9 +9,7 @@ generator client {
 
 enum Role {
   Admin
-  Doctor
-  Nurse
-  Receptionist
+  Operator
 }
 
 enum AccountStatus {
@@ -24,7 +22,7 @@ model User {
   name      String
   email     String        @unique
   password  String
-  role      Role          @default(Receptionist)
+  role      Role          @default(Operator)
   status    AccountStatus @default(Active)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt

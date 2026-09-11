@@ -11,29 +11,29 @@ router.use(protect);
 
 router.route("/import")
   .post(
-    authorize("Admin", "Receptionist"),
+    authorize("Admin", "Operator"),
     PatientController.importBulk
   );
 
 router.route("/")
   .get(
-    authorize("Admin", "Doctor", "Nurse", "Receptionist"),
+    authorize("Admin", "Operator"),
     validate(queryPatientSchema, "query"),
     PatientController.list
   )
   .post(
-    authorize("Admin", "Receptionist"),
+    authorize("Admin", "Operator"),
     validate(createPatientSchema),
     PatientController.create
   );
 
 router.route("/:id")
   .get(
-    authorize("Admin", "Doctor", "Nurse", "Receptionist"),
+    authorize("Admin", "Operator"),
     PatientController.get
   )
   .put(
-    authorize("Admin", "Receptionist"),
+    authorize("Admin", "Operator"),
     validate(updatePatientSchema),
     PatientController.update
   )

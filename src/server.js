@@ -2,6 +2,7 @@ import http from "http";
 import app from "./app.js";
 import { env, logger, connectDatabase, disconnectDatabase } from "./config/index.js";
 
+
 // Handle uncaught exceptions (synchronous process-level failures)
 process.on("uncaughtException", (err) => {
   // Use logger.error, which is synchronous-safe for Winston console

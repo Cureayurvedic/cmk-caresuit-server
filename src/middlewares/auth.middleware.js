@@ -60,3 +60,6 @@ export const authorize = (...roles) => {
     next();
   };
 };
+
+export const restrictTo = authorize;
+

@@ -13,7 +13,7 @@ router.use(protect);
 // ──────────────────────────────────────────────────────────────────────────────
 router.get(
   "/bed-categories",
-  authorize("Admin", "Doctor", "Nurse", "Receptionist"),
+  authorize("Admin", "Operator"),
   BedCategoryController.list
 );
 router.post(
@@ -40,7 +40,7 @@ router.delete(
  */
 router.get(
   "/:category",
-  authorize("Admin", "Doctor", "Nurse", "Receptionist"),
+  authorize("Admin", "Operator"),
   SettingsController.list
 );
 
