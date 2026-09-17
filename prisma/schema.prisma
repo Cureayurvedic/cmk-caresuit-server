@@ -326,3 +326,19 @@ model Bed {
   @@index([status])
   @@map("beds")
 }
+
+model Accessory {
+  id              String   @id @default(uuid())
+  code            String   @unique // SKU / Product Code
+  name            String   // Product Name
+  price           Float    // Unit Price
+  sizesJson       String   // JSON array: [{ size: "S", stockQuantity: 10 }, ...]
+  minStockWarning Int      @default(5) // Low stock alert threshold
+  description     String?  // Product description
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([code])
+  @@index([name])
+  @@map("accessories")
+}
