@@ -26,6 +26,22 @@ const colors = {
 
 winston.addColors(colors);
 
+// File transports are only used in development (Vercel/production has a read-only filesystem)
+const fileTransports =
+  env.NODE_ENV !== "production"
+    ? [
+        new winston.transports.File({
+          filename: "logs/error.log",
+          level: "error",
+          format: json(),
+        }),
+        new winston.transports.File({
+          filename: "logs/app.log",
+          format: json(),
+        }),
+      ]
+    : [];
+
 const logger = winston.createLogger({
   level: env.LOG_LEVEL,
   levels,
@@ -33,19 +49,7 @@ const logger = winston.createLogger({
     timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     errors({ stack: true })
   ),
-  transports: [
-    // Output error logs to a separate file
-    new winston.transports.File({
-      filename: "logs/error.log",
-      level: "error",
-      format: json(),
-    }),
-    // Output all logs to a general application log file
-    new winston.transports.File({
-      filename: "logs/app.log",
-      format: json(),
-    }),
-  ],
+  transports: fileTransports,
 });
 
 // Configure Console Transport
@@ -59,7 +63,7 @@ if (env.NODE_ENV !== "production") {
     })
   );
 } else {
-  // JSON console logs in production
+  // JSON console logs in production (Vercel captures stdout)
   logger.add(
     new winston.transports.Console({
       format: combine(
