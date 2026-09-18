@@ -1,23 +1,22 @@
+import http from "http";
 import app from "./app.js";
 import { env, logger, connectDatabase, disconnectDatabase } from "./config/index.js";
 
 // ─── Database Initialization ──────────────────────────────────────────────────
-// On Vercel: runs once per cold start, then cached for warm invocations.
-// Any connection errors surface per-request through Express's error middleware,
-// which already has CORS headers applied — so the browser won't see a CORS error.
+// Runs once per cold start on Vercel, cached for warm invocations.
+// Errors surface through Express's error middleware (which already has CORS
+// headers), so the browser never sees a raw CORS error on DB failure.
 // ─────────────────────────────────────────────────────────────────────────────
 connectDatabase().catch((err) => {
-  logger.error("Initial DB connection failed (will retry on first request):", err.message);
+  logger.error("Initial DB connection failed:", err.message);
 });
 
 // ─── Local Development Server ─────────────────────────────────────────────────
-// On Vercel, VERCEL=1 is injected automatically — skip http.listen entirely.
+// Vercel automatically sets VERCEL=1 — skip http.listen on serverless.
 // ─────────────────────────────────────────────────────────────────────────────
 if (process.env.VERCEL !== "1") {
-  const { default: http } = await import("http");
-
   process.on("uncaughtException", (err) => {
-    logger.error("UNCAUGHT EXCEPTION! 💥 Shutting down process...", err);
+    logger.error("UNCAUGHT EXCEPTION! 💥 Shutting down...", err);
     process.exit(1);
   });
 
@@ -28,18 +27,15 @@ if (process.env.VERCEL !== "1") {
   });
 
   process.on("unhandledRejection", (err) => {
-    logger.error("UNHANDLED REJECTION! 💥 Shutting down gracefully...", err);
-    server.close(() => {
-      disconnectDatabase().finally(() => process.exit(1));
-    });
+    logger.error("UNHANDLED REJECTION! 💥 Shutting down...", err);
+    server.close(() => disconnectDatabase().finally(() => process.exit(1)));
   });
 
   const gracefulShutdown = (signal) => {
-    logger.warn(`Received ${signal}. Starting graceful shutdown...`);
+    logger.warn(`Received ${signal}. Graceful shutdown...`);
     server.close(async () => {
       try {
         await disconnectDatabase();
-        logger.info("Graceful shutdown completed.");
         process.exit(0);
       } catch (err) {
         logger.error(`Error closing DB: ${err.message}`);
@@ -54,6 +50,7 @@ if (process.env.VERCEL !== "1") {
 }
 
 // ─── Vercel Serverless Export ─────────────────────────────────────────────────
-// Vercel invokes this directly. Express handles CORS before any route logic.
+// Vercel invokes this. Express CORS middleware runs before any route logic.
 // ─────────────────────────────────────────────────────────────────────────────
 export default app;
+
