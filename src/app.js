@@ -14,12 +14,16 @@ app.set("trust proxy", 1);
 
 // CORS must be configured BEFORE helmet so security headers don't override CORS headers.
 // Explicit OPTIONS handler ensures preflight is always answered with CORS headers.
+const rawOrigin = env.CORS_ORIGIN ?? "*";
+// eslint-disable-next-line no-console
+console.log(`[CORS] Allowed origins: ${rawOrigin}`);
+
 const corsOptions = {
-  origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",").map((o) => o.trim()),
+  origin: rawOrigin === "*" ? true : rawOrigin.split(",").map((o) => o.trim()),
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 200, // Some browsers (IE11) choke on 204
+  optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions)); // Explicit preflight handler
