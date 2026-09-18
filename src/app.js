@@ -12,17 +12,20 @@ const app = express();
 // Trust proxy (needed for rate limiting behind a reverse proxy like Nginx)
 app.set("trust proxy", 1);
 
-// Global Security Middlewares
-app.use(helmet());
-
-// CORS Configuration
+// CORS must be configured BEFORE helmet so security headers don't override CORS headers.
+// Explicit OPTIONS handler ensures preflight is always answered with CORS headers.
 const corsOptions = {
-  origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(","),
+  origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",").map((o) => o.trim()),
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200, // Some browsers (IE11) choke on 204
 };
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // Explicit preflight handler
+
+// Global Security Middlewares (after CORS)
+app.use(helmet());
 
 // Rate Limiting for general API routes in production
 if (env.NODE_ENV === "production") {
