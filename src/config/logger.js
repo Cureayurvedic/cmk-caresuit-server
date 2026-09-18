@@ -26,9 +26,12 @@ const colors = {
 
 winston.addColors(colors);
 
-// File transports are only used in development (Vercel/production has a read-only filesystem)
+// File transports CANNOT run on Vercel (read-only filesystem).
+// process.env.VERCEL is automatically set to "1" by Vercel on all deployments.
+const isVercel = process.env.VERCEL === "1";
+
 const fileTransports =
-  env.NODE_ENV !== "production"
+  !isVercel
     ? [
         new winston.transports.File({
           filename: "logs/error.log",
