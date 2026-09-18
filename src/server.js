@@ -1,58 +1,80 @@
-import http from "http";
 import app from "./app.js";
 import { env, logger, connectDatabase, disconnectDatabase } from "./config/index.js";
 
+// ─── Vercel Serverless Export ─────────────────────────────────────────────────
+// Vercel handles the HTTP layer; we just export the Express app.
+// connectDatabase() is called lazily so the cold start doesn't block the export.
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Handle uncaught exceptions (synchronous process-level failures)
-process.on("uncaughtException", (err) => {
-  // Use logger.error, which is synchronous-safe for Winston console
-  logger.error("UNCAUGHT EXCEPTION! 💥 Shutting down process...", err);
-  process.exit(1);
-});
+let dbConnected = false;
 
-// Connect to the Database
-await connectDatabase();
-
-const server = http.createServer(app);
-
-// Start the Server
-server.listen(env.PORT, () => {
-  logger.info(`🚀 Server running in ${env.NODE_ENV} mode on port ${env.PORT}`);
-});
-
-// Handle unhandled promise rejections (asynchronous process-level failures)
-process.on("unhandledRejection", (err) => {
-  logger.error("UNHANDLED REJECTION! 💥 Shutting down gracefully...", err);
-  server.close(() => {
-    disconnectDatabase().finally(() => {
-      process.exit(1);
-    });
-  });
-});
-
-// Centralized Graceful Shutdown Function
-const gracefulShutdown = (signal) => {
-  logger.warn(`Received ${signal}. Starting graceful shutdown...`);
-
-  server.close(async () => {
-    logger.info("HTTP server closed.");
-    try {
-      await disconnectDatabase();
-      logger.info("Graceful shutdown completed. Exiting process.");
-      process.exit(0);
-    } catch (err) {
-      logger.error(`Error during database disconnect: ${err.message}`);
-      process.exit(1);
-    }
-  });
-
-  // Enforce termination if resources don't release in time
-  setTimeout(() => {
-    logger.error("Forced exit: Graceful shutdown timed out.");
-    process.exit(1);
-  }, 10000);
+const ensureDb = async () => {
+  if (!dbConnected) {
+    await connectDatabase();
+    dbConnected = true;
+  }
 };
 
-// Register Graceful Shutdown Listeners
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+// Wrap the app so DB connects on first request (serverless-safe)
+const handler = async (req, res) => {
+  try {
+    await ensureDb();
+  } catch (err) {
+    logger.error("Database connection failed on cold start", err);
+    res.status(503).json({ success: false, message: "Service temporarily unavailable." });
+    return;
+  }
+  app(req, res);
+};
+
+// ─── Local Development Server ────────────────────────────────────────────────
+// Only start an HTTP server when running locally (not on Vercel).
+// ─────────────────────────────────────────────────────────────────────────────
+if (process.env.VERCEL !== "1") {
+  import("http").then(({ default: http }) => {
+    process.on("uncaughtException", (err) => {
+      logger.error("UNCAUGHT EXCEPTION! 💥 Shutting down process...", err);
+      process.exit(1);
+    });
+
+    connectDatabase()
+      .then(() => {
+        const server = http.createServer(app);
+
+        server.listen(env.PORT, () => {
+          logger.info(`🚀 Server running in ${env.NODE_ENV} mode on port ${env.PORT}`);
+        });
+
+        process.on("unhandledRejection", (err) => {
+          logger.error("UNHANDLED REJECTION! 💥 Shutting down gracefully...", err);
+          server.close(() => {
+            disconnectDatabase().finally(() => process.exit(1));
+          });
+        });
+
+        const gracefulShutdown = (signal) => {
+          logger.warn(`Received ${signal}. Starting graceful shutdown...`);
+          server.close(async () => {
+            try {
+              await disconnectDatabase();
+              process.exit(0);
+            } catch (err) {
+              logger.error(`Error closing DB: ${err.message}`);
+              process.exit(1);
+            }
+          });
+          setTimeout(() => process.exit(1), 10000);
+        };
+
+        process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+        process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+      })
+      .catch((err) => {
+        logger.error("Failed to connect to database on startup", err);
+        process.exit(1);
+      });
+  });
+}
+
+// Export for Vercel serverless
+export default handler;
